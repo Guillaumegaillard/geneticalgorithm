@@ -265,6 +265,38 @@ class geneticalgorithm():
             self.mniwi=int(self.param['max_iteration_without_improv'])
 
 
+    def chunk_list(self,ll,num_chunks):
+        chunk_size=len(ll)//num_chunks +1
+        return([ll[chunk_size*j:chunk_size*(j+1)] for j in range(num_chunks-1)]+[ll[chunk_size*(num_chunks-1):]])
+
+    def merge_list_map(self,ll):
+        final=[]
+        for i in ll:
+            final+=i
+        return(final)  
+
+    def new_babies(self,Xl):
+        return(list(zip(*map(self.new_baby,Xl))))
+        
+    def new_baby(self,config):
+
+        ef_par,par_count=config
+
+        r1=np.random.randint(0,par_count)
+        r2=np.random.randint(0,par_count)
+        pvar1=ef_par[r1,: self.dim].copy()
+        pvar2=ef_par[r2,: self.dim].copy()
+
+        ch=self.cross(pvar1,pvar2,self.c_type)
+        ch1=ch[0].copy()
+        ch2=ch[1].copy()
+
+        ch1=self.mut(ch1)
+        ch2=self.mutmidle(ch2,pvar1,pvar2)
+
+        return(ch1,ch2)
+
+
         #############################################################
     def run(self, plot=False, initial_idv=None):
 
@@ -294,6 +326,7 @@ class geneticalgorithm():
         var=np.zeros(self.dim)
 
         if self.multiprocessing_ncpus > 1:
+            pool = Pool(self.multiprocessing_ncpus)
             var_list1 = []
         
         if type(initial_idv).__module__=='numpy':#
@@ -323,8 +356,7 @@ class geneticalgorithm():
                     pop[p]=solo1.copy()
 
             if self.multiprocessing_ncpus > 1:
-                pool = Pool(self.multiprocessing_ncpus)
-                obj_list1 = pool.map(self.sim, var_list1)
+                obj_list1 = self.merge_list_map(pool.map(self.super_sim, self.chunk_list(var_list1,self.multiprocessing_ncpus)))
                 for p in range(0, self.pop_s):
                     obj = obj_list1[p]
                     solo1[self.dim]=obj
@@ -413,40 +445,17 @@ class geneticalgorithm():
                 pop[k]=par[k].copy()
 
             if self.multiprocessing_ncpus > 1:
-                var_list1 = []
-                var_list2 = []
-                k_list = []
-            for k in range(self.par_s, self.pop_s, 2):
-                r1=np.random.randint(0,par_count)
-                r2=np.random.randint(0,par_count)
-                pvar1=ef_par[r1,: self.dim].copy()
-                pvar2=ef_par[r2,: self.dim].copy()
+                k_list = list(range(self.par_s, self.pop_s, 2))
+                input_list=[(ef_par,par_count)]*len(k_list)
+                ch_list = self.merge_list_map(pool.map(self.new_babies,self.chunk_list(input_list,self.multiprocessing_ncpus)))
+                var_list1=ch_list[0]
+                var_list2=ch_list[1]
 
-                ch=self.cross(pvar1,pvar2,self.c_type)
-                ch1=ch[0].copy()
-                ch2=ch[1].copy()
+                # obj_list1 = pool.map(self.sim, var_list1)
+                obj_list1 = self.merge_list_map(pool.map(self.super_sim, self.chunk_list(var_list1,self.multiprocessing_ncpus)))
+                # obj_list2 = pool.map(self.sim, var_list2)
+                obj_list2 = self.merge_list_map(pool.map(self.super_sim, self.chunk_list(var_list2,self.multiprocessing_ncpus)))
 
-                ch1=self.mut(ch1)
-                ch2=self.mutmidle(ch2,pvar1,pvar2)
-
-                if self.multiprocessing_ncpus > 1:
-                    k_list.append(k)
-                    var_list1.append(ch1.copy())
-                    var_list2.append(ch2.copy())
-
-                else:
-                    solo1[: self.dim]=ch1.copy()
-                    obj=self.sim(ch1)
-                    solo1[self.dim]=obj
-                    pop[k]=solo1.copy()
-                    solo2[: self.dim]=ch2.copy()
-                    obj=self.sim(ch2)
-                    solo2[self.dim]=obj
-                    pop[k+1]=solo2.copy()
-
-            if self.multiprocessing_ncpus > 1:
-                obj_list1 = pool.map(self.sim, var_list1)
-                obj_list2 = pool.map(self.sim, var_list2)
                 for k, ch1, obj1, ch2, obj2 in zip(k_list, var_list1,
                         obj_list1, var_list2, obj_list2):
                     solo1[: self.dim]=ch1
@@ -454,6 +463,19 @@ class geneticalgorithm():
                     pop[k]=solo1.copy()
                     solo2[: self.dim]=ch2
                     solo2[self.dim]=obj2
+                    pop[k+1]=solo2.copy()
+
+            else:
+                for k in range(self.par_s, self.pop_s, 2):
+                    ch1,ch2=self.new_baby((ef_par,par_count))
+
+                    solo1[: self.dim]=ch1.copy()
+                    obj=self.sim(ch1)
+                    solo1[self.dim]=obj
+                    pop[k]=solo1.copy()
+                    solo2[: self.dim]=ch2.copy()
+                    obj=self.sim(ch2)
+                    solo2[self.dim]=obj
                     pop[k+1]=solo2.copy()
 
         #############################################################
@@ -555,12 +577,14 @@ class geneticalgorithm():
 
         ran_mut=minpp + np.random.random(size=self.dim)*(maxpp_reals-minpp)
         x[self.reals[0]]=np.where(ran_a[self.reals[0]]<self.prob_mut,ran_mut[self.reals[0]],x[self.reals[0]])
-        
+
         return x
 ###############################################################################
     def evaluate(self):
         return self.f(self.temp)
 ###############################################################################
+    def super_sim(self,Xl):
+        return(list(map(self.sim,Xl)))
     def sim(self,X):
         self.temp=X.copy()
         obj=None
