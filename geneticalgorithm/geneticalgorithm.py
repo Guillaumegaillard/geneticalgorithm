@@ -266,7 +266,7 @@ class geneticalgorithm():
 
 
         #############################################################
-    def run(self, plot=False):
+    def run(self, plot=False, initial_idv=None):
 
         if self.multiprocessing_ncpus > 1:
             if self.multiprocessing_engine is None:
@@ -293,32 +293,41 @@ class geneticalgorithm():
 
         if self.multiprocessing_ncpus > 1:
             var_list1 = []
-        for p in range(0,self.pop_s):
+        
+        if type(initial_idv).__module__=='numpy':#
+            var=initial_idv
+            obj=self.sim(initial_idv)
+            solo1[self.dim]=obj
+            for p in range(0, self.pop_s):
+                pop[p]=solo1.copy()
 
-            for i in self.integers[0]:
-                var[i]=np.random.randint(self.var_bound[i][0],\
-                        self.var_bound[i][1]+1)
-                solo1[i]=var[i].copy()
-            for i in self.reals[0]:
-                var[i]=self.var_bound[i][0]+np.random.random()*\
-                (self.var_bound[i][1]-self.var_bound[i][0])
-                solo1[i]=var[i].copy()
+        else:
+            for p in range(0,self.pop_s):
+
+                for i in self.integers[0]:
+                    var[i]=np.random.randint(self.var_bound[i][0],\
+                            self.var_bound[i][1]+1)
+                    solo1[i]=var[i].copy()
+                for i in self.reals[0]:
+                    var[i]=self.var_bound[i][0]+np.random.random()*\
+                    (self.var_bound[i][1]-self.var_bound[i][0])
+                    solo1[i]=var[i].copy()
+
+                if self.multiprocessing_ncpus > 1:
+                    var_list1.append(var)
+
+                else:
+                    obj=self.sim(var)
+                    solo1[self.dim]=obj
+                    pop[p]=solo1.copy()
 
             if self.multiprocessing_ncpus > 1:
-                var_list1.append(var)
-
-            else:
-                obj=self.sim(var)
-                solo1[self.dim]=obj
-                pop[p]=solo1.copy()
-
-        if self.multiprocessing_ncpus > 1:
-            pool = Pool(self.multiprocessing_ncpus)
-            obj_list1 = pool.map(self.sim, var_list1)
-            for p in range(0, self.pop_s):
-                obj = obj_list1[p]
-                solo1[self.dim]=obj
-                pop[p]=solo1.copy()
+                pool = Pool(self.multiprocessing_ncpus)
+                obj_list1 = pool.map(self.sim, var_list1)
+                for p in range(0, self.pop_s):
+                    obj = obj_list1[p]
+                    solo1[self.dim]=obj
+                    pop[p]=solo1.copy()
 
         #############################################################
 
