@@ -284,6 +284,8 @@ class geneticalgorithm():
         self.integers=np.where(self.var_type=='int')
         self.reals=np.where(self.var_type=='real')
 
+        self.lsi=len(self.integers[0])
+        self.lsr=len(self.reals[0])
 
 
         pop=np.array([np.zeros(self.dim+1)]*self.pop_s)
@@ -304,15 +306,14 @@ class geneticalgorithm():
         else:
             for p in range(0,self.pop_s):
 
-                for i in self.integers[0]:
-                    var[i]=np.random.randint(self.var_bound[i][0],\
-                            self.var_bound[i][1]+1)
-                    solo1[i]=var[i].copy()
-                for i in self.reals[0]:
-                    var[i]=self.var_bound[i][0]+np.random.random()*\
-                    (self.var_bound[i][1]-self.var_bound[i][0])
-                    solo1[i]=var[i].copy()
+                var[self.integers[0]]=np.random.randint(self.var_bound[self.integers[0],0],self.var_bound[self.integers[0],1]+1,
+                    size=self.lsi)
+                solo1[self.integers[0]]=var[self.integers[0]].copy()
 
+                var[self.reals[0]]=self.var_bound[self.reals[0],0]+np.random.random(size=self.lsr)*(
+                    self.var_bound[self.reals[0],1]-self.var_bound[self.reals[0],0])
+                solo1[self.reals[0]]=var[self.reals[0]].copy()
+                
                 if self.multiprocessing_ncpus > 1:
                     var_list1.append(var)
 
@@ -398,10 +399,9 @@ class geneticalgorithm():
             ef_par_list=np.array([False]*self.par_s)
             par_count=0
             while par_count==0:
-                for k in range(0,self.par_s):
-                    if np.random.random()<=self.prob_cross:
-                        ef_par_list[k]=True
-                        par_count+=1
+                ran_cross=np.random.random(size=self.par_s)
+                ef_par_list=np.where(ran_cross<=self.prob_cross)
+                par_count=np.count_nonzero(ef_par_list)
 
             ef_par=par[ef_par_list].copy()
 
