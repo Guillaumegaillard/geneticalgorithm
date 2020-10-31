@@ -247,6 +247,7 @@ class geneticalgorithm():
                     self.iterate+=(self.var_bound[i][1]-self.var_bound[i][0])*50*(100/self.pop_s)
             self.iterate=int(self.iterate)
             if (self.iterate*self.pop_s)>10000000:
+                print("GA shrinks #evals to 10000000")
                 self.iterate=10000000/self.pop_s
         else:
             self.iterate=int(self.param['max_num_iteration'])
