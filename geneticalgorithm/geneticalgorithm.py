@@ -313,7 +313,7 @@ class geneticalgorithm():
                 var[self.reals[0]]=self.var_bound[self.reals[0],0]+np.random.random(size=self.lsr)*(
                     self.var_bound[self.reals[0],1]-self.var_bound[self.reals[0],0])
                 solo1[self.reals[0]]=var[self.reals[0]].copy()
-                
+
                 if self.multiprocessing_ncpus > 1:
                     var_list1.append(var)
 
@@ -513,72 +513,49 @@ class geneticalgorithm():
 
         if c_type=='one_point':
             ran=np.random.randint(0,self.dim)
-            for i in range(0,ran):
-                ofs1[i]=y[i].copy()
-                ofs2[i]=x[i].copy()
+
+            ofs1[:ran]=y[:ran].copy()
+            ofs2[:ran]=x[:ran].copy()
+
 
         if c_type=='two_point':
-
             ran1=np.random.randint(0,self.dim)
             ran2=np.random.randint(ran1,self.dim)
 
-            for i in range(ran1,ran2):
-                ofs1[i]=y[i].copy()
-                ofs2[i]=x[i].copy()
+            ofs1[ran1:ran2]=y[ran1:ran2].copy()
+            ofs2[ran1:ran2]=x[ran1:ran2].copy()
 
         if c_type=='uniform':
-
-            for i in range(0, self.dim):
-                ran=np.random.random()
-                if ran <0.5:
-                    ofs1[i]=y[i].copy()
-                    ofs2[i]=x[i].copy()
+            ran_a=np.random.random(size=self.dim)
+            ofs1=np.where(ran_a<0.5,y,x)
+            ofs2=np.where(ran_a<0.5,x,y)
 
         return np.array([ofs1,ofs2])
 ###############################################################################
 
     def mut(self,x):
+        ran_a=np.random.random(size=self.lsi)
+        ran_mut=np.random.randint(self.var_bound[self.integers[0],0],self.var_bound[self.integers[0],1]+1)#,size=self.lsi)        
+        x[self.integers[0]]=np.where(ran_a<self.prob_mut,ran_mut,x[self.integers[0]])
 
-        for i in self.integers[0]:
-            ran=np.random.random()
-            if ran < self.prob_mut:
-
-                x[i]=np.random.randint(self.var_bound[i][0],\
-                 self.var_bound[i][1]+1)
-
-
-
-        for i in self.reals[0]:
-            ran=np.random.random()
-            if ran < self.prob_mut:
-
-               x[i]=self.var_bound[i][0]+np.random.random()*\
-                (self.var_bound[i][1]-self.var_bound[i][0])
+        ran_a=np.random.random(size=self.lsr)
+        ran_mut=self.var_bound[self.reals[0],0]+np.random.random(size=self.lsr)*(self.var_bound[self.reals[0],1]-self.var_bound[self.reals[0],0])        
+        x[self.reals[0]]=np.where(ran_a<self.prob_mut,ran_mut,x[self.reals[0]])
 
         return x
 ###############################################################################
     def mutmidle(self, x, p1, p2):
-        for i in self.integers[0]:
-            ran=np.random.random()
-            if ran < self.prob_mut:
-                if p1[i]<p2[i]:
-                    x[i]=np.random.randint(p1[i],p2[i])
-                elif p1[i]>p2[i]:
-                    x[i]=np.random.randint(p2[i],p1[i])
-                else:
-                    x[i]=np.random.randint(self.var_bound[i][0],\
-                 self.var_bound[i][1]+1)
+        minpp=np.where(p1!=p2,np.where(p1>p2,p2,p1),self.var_bound[:,0])
+        maxpp_ints=np.where(p1!=p2,np.where(p1>p2,p1,p2),self.var_bound[:,1]+1)
+        maxpp_reals=np.where(p1!=p2,maxpp_ints,maxpp_ints-1)
 
-        for i in self.reals[0]:
-            ran=np.random.random()
-            if ran < self.prob_mut:
-                if p1[i]<p2[i]:
-                    x[i]=p1[i]+np.random.random()*(p2[i]-p1[i])
-                elif p1[i]>p2[i]:
-                    x[i]=p2[i]+np.random.random()*(p1[i]-p2[i])
-                else:
-                    x[i]=self.var_bound[i][0]+np.random.random()*\
-                (self.var_bound[i][1]-self.var_bound[i][0])
+        ran_mut=np.random.randint(minpp,maxpp_ints)
+        ran_a=np.random.random(size=self.dim)
+        x[self.integers[0]]=np.where(ran_a[self.integers[0]]<self.prob_mut,ran_mut[self.integers[0]],x[self.integers[0]])
+
+        ran_mut=minpp + np.random.random(size=self.dim)*(maxpp_reals-minpp)
+        x[self.reals[0]]=np.where(ran_a[self.reals[0]]<self.prob_mut,ran_mut[self.reals[0]],x[self.reals[0]])
+        
         return x
 ###############################################################################
     def evaluate(self):
