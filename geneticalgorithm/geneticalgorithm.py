@@ -571,9 +571,11 @@ class geneticalgorithm():
         maxpp_ints=np.where(p1!=p2,np.where(p1>p2,p1,p2),self.var_bound[:,1]+1)
         maxpp_reals=np.where(p1!=p2,maxpp_ints,maxpp_ints-1)
 
-        ran_mut=np.random.randint(minpp,maxpp_ints)
         ran_a=np.random.random(size=self.dim)
-        x[self.integers[0]]=np.where(ran_a[self.integers[0]]<self.prob_mut,ran_mut[self.integers[0]],x[self.integers[0]])
+
+        ran_mut_ints=np.zeros(self.dim,dtype='int')
+        ran_mut_ints[self.integers[0]]=np.random.randint(minpp[self.integers[0]],maxpp_ints[self.integers[0]])
+        x[self.integers[0]]=np.where(ran_a[self.integers[0]]<self.prob_mut,ran_mut_ints[self.integers[0]],x[self.integers[0]])
 
         ran_mut=minpp + np.random.random(size=self.dim)*(maxpp_reals-minpp)
         x[self.reals[0]]=np.where(ran_a[self.reals[0]]<self.prob_mut,ran_mut[self.reals[0]],x[self.reals[0]])
