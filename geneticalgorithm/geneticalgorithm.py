@@ -276,7 +276,8 @@ class geneticalgorithm():
         return(final)  
 
     def new_babies(self,Xl):
-        return(list(zip(*map(self.new_baby,Xl))))
+        return(list(map(self.new_baby,Xl)))
+        # return(list(zip(*map(self.new_baby,Xl))))
         
     def new_baby(self,config):
 
@@ -448,8 +449,10 @@ class geneticalgorithm():
                 k_list = list(range(self.par_s, self.pop_s, 2))
                 input_list=[(ef_par,par_count)]*len(k_list)
                 ch_list = self.merge_list_map(pool.map(self.new_babies,self.chunk_list(input_list,self.multiprocessing_ncpus)))
-                var_list1=ch_list[0]
-                var_list2=ch_list[1]
+                # var_list1=ch_list[0]
+                # var_list2=ch_list[1]
+                var_list1=[ch[0] for ch in ch_list]
+                var_list2=[ch[1] for ch in ch_list]
 
                 # obj_list1 = pool.map(self.sim, var_list1)
                 obj_list1 = self.merge_list_map(pool.map(self.super_sim, self.chunk_list(var_list1,self.multiprocessing_ncpus)))
