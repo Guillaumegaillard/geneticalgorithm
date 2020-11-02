@@ -275,6 +275,7 @@ class geneticalgorithm():
         # return([item for sublist in ll for item in sublist]) 
 
     def new_babies(self,Xl):
+        np.random.seed()
         return(list(map(self.new_baby,Xl)))
         
     def new_baby(self,rvals):
