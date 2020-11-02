@@ -29,7 +29,7 @@ import numpy as np
 import sys
 import time
 from func_timeout import func_timeout, FunctionTimedOut
-
+from itertools import chain as iter_chain
 ###############################################################################
 ###############################################################################
 ###############################################################################
@@ -270,22 +270,20 @@ class geneticalgorithm():
         return([ll[chunk_size*j:chunk_size*(j+1)] for j in range(num_chunks-1)]+[ll[chunk_size*(num_chunks-1):]])
 
     def merge_list_map(self,ll):
-        final=[]
-        for i in ll:
-            final+=i
-        return(final)  
+        #to choose from https://stackoverflow.com/questions/952914/how-to-make-a-flat-list-out-of-list-of-lists
+        return(list(iter_chain.from_iterable(ll)))
+        # return([item for sublist in ll for item in sublist]) 
 
     def new_babies(self,Xl):
-        return(list(zip(*map(self.new_baby,Xl))))
+        return(list(map(self.new_baby,Xl)))
         
-    def new_baby(self,config):
+    def new_baby(self,rvals):
 
-        ef_par,par_count=config
+        r1=rvals[0]
+        r2=rvals[1]
 
-        r1=np.random.randint(0,par_count)
-        r2=np.random.randint(0,par_count)
-        pvar1=ef_par[r1,: self.dim].copy()
-        pvar2=ef_par[r2,: self.dim].copy()
+        pvar1=self.ef_par[r1,: self.dim].copy()
+        pvar2=self.ef_par[r2,: self.dim].copy()
 
         ch=self.cross(pvar1,pvar2,self.c_type)
         ch1=ch[0].copy()
@@ -294,7 +292,10 @@ class geneticalgorithm():
         ch1=self.mut(ch1)
         ch2=self.mutmidle(ch2,pvar1,pvar2)
 
-        return(ch1,ch2)
+        v1=self.sim(ch1)
+        v2=self.sim(ch2)
+
+        return([np.append(ch1,v1),np.append(ch2,v2)])
 
 
         #############################################################
@@ -435,7 +436,7 @@ class geneticalgorithm():
                 ef_par_list=np.where(ran_cross<=self.prob_cross)
                 par_count=np.count_nonzero(ef_par_list)
 
-            ef_par=par[ef_par_list].copy()
+            self.ef_par=par[ef_par_list].copy()
 
             #############################################################
             #New generation
@@ -444,39 +445,18 @@ class geneticalgorithm():
             for k in range(0,self.par_s):
                 pop[k]=par[k].copy()
 
+            k_list = np.arange(self.par_s, self.pop_s, 2)
+            k_list_odds = np.arange(self.par_s+1, self.pop_s, 2)
+            ll=(self.pop_s-self.par_s)//2
+
+            rvals=np.random.randint(0, par_count, size=(ll,2))
             if self.multiprocessing_ncpus > 1:
-                k_list = list(range(self.par_s, self.pop_s, 2))
-                input_list=[(ef_par,par_count)]*len(k_list)
-                baby_subsets=list(zip(*pool.map(self.new_babies,self.chunk_list(input_list,self.multiprocessing_ncpus))))
-                var_list1 = self.merge_list_map(baby_subsets[0])
-                var_list2 = self.merge_list_map(baby_subsets[1])
-
-                # obj_list1 = pool.map(self.sim, var_list1)
-                obj_list1 = self.merge_list_map(pool.map(self.super_sim, self.chunk_list(var_list1,self.multiprocessing_ncpus)))
-                # obj_list2 = pool.map(self.sim, var_list2)
-                obj_list2 = self.merge_list_map(pool.map(self.super_sim, self.chunk_list(var_list2,self.multiprocessing_ncpus)))
-
-                for k, ch1, obj1, ch2, obj2 in zip(k_list, var_list1,
-                        obj_list1, var_list2, obj_list2):
-                    solo1[: self.dim]=ch1
-                    solo1[self.dim]=obj1
-                    pop[k]=solo1.copy()
-                    solo2[: self.dim]=ch2
-                    solo2[self.dim]=obj2
-                    pop[k+1]=solo2.copy()
-
+                # outpool=np.array(list(pool.map(self.new_baby, rvals)))
+                outpool=np.array(self.merge_list_map(pool.map(self.new_babies, self.chunk_list(rvals,self.multiprocessing_ncpus))))
             else:
-                for k in range(self.par_s, self.pop_s, 2):
-                    ch1,ch2=self.new_baby((ef_par,par_count))
-
-                    solo1[: self.dim]=ch1.copy()
-                    obj=self.sim(ch1)
-                    solo1[self.dim]=obj
-                    pop[k]=solo1.copy()
-                    solo2[: self.dim]=ch2.copy()
-                    obj=self.sim(ch2)
-                    solo2[self.dim]=obj
-                    pop[k+1]=solo2.copy()
+                outpool=np.array(list(map(self.new_baby, rvals)))
+            pop[k_list]=outpool[:,0]
+            pop[k_list_odds]=outpool[:,1]
 
         #############################################################
             t+=1
@@ -556,29 +536,33 @@ class geneticalgorithm():
 ###############################################################################
 
     def mut(self,x):
-        ran_a=np.random.random(size=self.lsi)
-        ran_mut=np.random.randint(self.var_bound[self.integers[0],0],self.var_bound[self.integers[0],1]+1)#,size=self.lsi)        
-        x[self.integers[0]]=np.where(ran_a<self.prob_mut,ran_mut,x[self.integers[0]])
+        if self.lsi>0:
+            ran_a=np.random.random(size=self.lsi)
+            ran_mut=np.random.randint(self.var_bound[self.integers[0],0],self.var_bound[self.integers[0],1]+1)#,size=self.lsi)        
+            x[self.integers[0]]=np.where(ran_a<self.prob_mut,ran_mut,x[self.integers[0]])
 
-        ran_a=np.random.random(size=self.lsr)
-        ran_mut=self.var_bound[self.reals[0],0]+np.random.random(size=self.lsr)*(self.var_bound[self.reals[0],1]-self.var_bound[self.reals[0],0])        
-        x[self.reals[0]]=np.where(ran_a<self.prob_mut,ran_mut,x[self.reals[0]])
+        if self.lsr>0:
+            ran_a=np.random.random(size=self.lsr)
+            ran_mut=self.var_bound[self.reals[0],0]+np.random.random(size=self.lsr)*(self.var_bound[self.reals[0],1]-self.var_bound[self.reals[0],0])        
+            x[self.reals[0]]=np.where(ran_a<self.prob_mut,ran_mut,x[self.reals[0]])
 
         return x
 ###############################################################################
     def mutmidle(self, x, p1, p2):
         minpp=np.where(p1!=p2,np.where(p1>p2,p2,p1),self.var_bound[:,0])
         maxpp_ints=np.where(p1!=p2,np.where(p1>p2,p1,p2),self.var_bound[:,1]+1)
-        maxpp_reals=np.where(p1!=p2,maxpp_ints,maxpp_ints-1)
-
+        
         ran_a=np.random.random(size=self.dim)
+        
+        if self.lsr>0:
+            maxpp_reals=np.where(p1!=p2,maxpp_ints,maxpp_ints-1)
+            ran_mut=minpp + np.random.random(size=self.dim)*(maxpp_reals-minpp)
+            x[self.reals[0]]=np.where(ran_a[self.reals[0]]<self.prob_mut,ran_mut[self.reals[0]],x[self.reals[0]])
 
-        ran_mut_ints=np.zeros(self.dim,dtype='int')
-        ran_mut_ints[self.integers[0]]=np.random.randint(minpp[self.integers[0]],maxpp_ints[self.integers[0]])
-        x[self.integers[0]]=np.where(ran_a[self.integers[0]]<self.prob_mut,ran_mut_ints[self.integers[0]],x[self.integers[0]])
-
-        ran_mut=minpp + np.random.random(size=self.dim)*(maxpp_reals-minpp)
-        x[self.reals[0]]=np.where(ran_a[self.reals[0]]<self.prob_mut,ran_mut[self.reals[0]],x[self.reals[0]])
+        if self.lsi>0:
+            ran_mut_ints=np.zeros(self.dim,dtype='int')
+            ran_mut_ints[self.integers[0]]=np.random.randint(minpp[self.integers[0]],maxpp_ints[self.integers[0]])
+            x[self.integers[0]]=np.where(ran_a[self.integers[0]]<self.prob_mut,ran_mut_ints[self.integers[0]],x[self.integers[0]])
 
         return x
 ###############################################################################
